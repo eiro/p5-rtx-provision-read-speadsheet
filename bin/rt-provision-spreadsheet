@@ -2,17 +2,25 @@
 use Eirotic;
 use Test::More;
 use open qw< :utf8 :std >;
+use Data::Dumper;
 use RTx::Provision::Read::Spreadsheet qw(
     rt_provision sheets
     values_for keys_for
 );
 
-sub yml { say YAML::Dump rt_provision @ARGV }
+my $cmd = shift @ARGV; 
+my $r = rt_provision @ARGV ;
 
-for (shift @ARGV) {
-    yml when 'yml';
-    default die "alone";
+if ( $cmd eq 'yml'    ) { print YAML::Dump $r }
+elsif ($cmd eq 'perl' ) {
+    print 'my $VAR1;'
+    , map { sprintf '@%s = (@{ %s  });
+    ', $_ , Dumper $$r{$_} } keys %$r;
 }
+
+1;
+
+
 
 
 # say YAML::Dump values_for  membership => sheets 'examples/simple.ods';
