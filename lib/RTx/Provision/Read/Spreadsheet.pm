@@ -1,102 +1,73 @@
 package RTx::Provision::Read::Spreadsheet;
-use Moo;
-use Eirotic;
 use Spreadsheet::Read;
 use Array::Transpose;
-use namespace::clean;
-use Type::Tiny;
+use Eirotic;
+use Exporter 'import';
+our @EXPORT_OK = qw(
+    sheets
+    rt_provision
+    sheets_as_rt_provision
+    values_for keys_for
+);
 
-sub carry_data :prototype(_)
-    { grep defined && /\S/, @{shift,} } 
-
-sub map_hash_with ($attrs,@data)
-    { map { my %e; @e{ @$attrs } = @$_; \%e } @data }
-
-sub _as_table :prototype(_) {
-    # removing useless cells
-    # * remove empty lines
-    # * transpose
-    # * remove empty lines again
-
-    # now first column is the list of attributes, the rest data
-    my ($attrs, @data ) = 
-        grep carry_data, 
-        transpose[
-            grep {defined and carry_data}
-            @{+shift} ];
-
-    [ $attrs, \@data ];
-
+sub trimi            { s/ ^\s+ | \s+$ //xg  }
+sub trim             { s/ ^\s+ | \s+$ //xgr }
+sub values_for  ($key,$sheets=$_) { $$sheets{$key}[1] }
+sub keys_for    ($key,$sheets=$_) { $$sheets{$key}[0] }
+sub entries_for {
+    my @v = (@_,$_)[0,1];
+    my @f = @{keys_for @v};
+    map { my %e; @e{@f} = @$_ ; \%e } @{values_for @v};
 }
 
-# my $ExistingFile = sub ($path) {
-#     -f $path or die "$path must be an existing file"
-# };
-# 
-# my $hashRef = sub ($v) {
-#     defined $v or die 
-#     $r// = 'Undefined';
-#     defined $r and $r='Undefined';
-#     defined $r &&
-#     grep /HASH/, ref $r or die "$r must be"
-# 
-# }
+sub cell_with_data :prototype() {
+    defined or return;
+    ref and die;
+    trimi;
+    length
+}
 
-my @definedHashRef = ( default => sub{+{}} );
+sub line_with_data :prototype(_) { grep cell_with_data, @{shift,} }
 
-my $ExistingFile = 
-Type::Tiny->new
-( name        => 'ExistingFile'
-, constraint  => sub {-f}
-, message     => sub {"$_ must be an existing file"} );
+sub columns :prototype(_) {
+    # columns are [$header,[@entries]]
+    my ($attrs, @data ) =
+        grep line_with_data  # remove empty lines again (actually empty cols)
+        , transpose[       # rotate
+            grep line_with_data, # remove empty lines
+            @{shift,} ];
+    [ $attrs, \@data ];
+}
 
-my $HashRef = Type::Tiny->new
-( name        => 'HashRef'
-, constraint  => sub { grep /HASH/, ref }
-, message     => sub {"$_ must be a ref to an hash"} );
+sub sheets ($file) {
+    my ($summary, @data) = @{ ReadData $file };
+    # sheet maps
+    # columns are [$attrs,[@entries]]
 
-has qw( source is rw required 1 ), isa => $ExistingFile;
+    my %sheets = map { $$_{label}, columns $$_{cell} } @data;
 
-has qw( read      is lazy )
-, default => sub ($self) { ReadData $self->source };
+    # remove empty sheets
+    map {
+        delete $sheets{$_} unless
+            grep {defined and @$_} @{ $sheets{$_} }
+    } keys %sheets;
 
-has qw( _cells is lazy )
-, default => sub ($self) {
-    +{ map {
-        my @v =
-            grep defined,
-            @{$_ }{qw( label cell )};
-        if (@v == 2) { @v }
-        else {} 
-    } @{ $self->read } }
+    \%sheets;
 };
 
-has qw( _table   is ro ) , @definedHashRef;
-has qw( _entries is ro ) , @definedHashRef;
-
-sub table ($self,$key=return $self->_table) {
-    $self->_table->{$key}
-        ||= _as_table($self->_cells->{$key})
-        ||  die "the $key sheet is missing  in $self->source"
-}
-
-sub attrs    ($self,$table) { $self->table($table)->[0] }
-sub data     ($self,$table) { $self->table($table)->[1] }
-sub _lines   ($self,$table) {
-    map { $self->attrs($_), @{ $self->data($_) } }
-        $table
-}
-sub entries  ($self,$table) { map_hash_with $self->_lines($table) }  
 
 
-sub dump ($self) {
-    my %config =
-        ( map +( $_ => [ $self->entries($_) ] )
-        , qw( Queues ));
+sub sheets_as_rt_provision ($sheets) {
 
+    my %config = map
+        { $_ => [entries_for $_, $sheets] }
+        qw( Queues );
+
+
+    # add members to the groups reading the 'membership' sheet
     $config{Groups} = do {
 
-        my $G = +{ map { $$_{Name} => $_ } $self->entries('Groups') };
+        my $G = +{ map { $$_{Name} => $_ } entries_for Groups => $sheets };
 
         map { push
             @{ $G
@@ -104,34 +75,28 @@ sub dump ($self) {
                 -> {Members}
                 -> {$$_{Type}} ||= [] }
             , $$_{Member}
-        } $self->entries('membership');
+        } entries_for membership => $sheets;
 
         [ values %$G ]
 
     };
 
+    #add possible values to CustomFields reading the 'CustomFields' sheet
     $config{CustomFields} = do {
         my $V= {};
-        map { push @{ $$V{ delete $$_{CustomField} } ||= [] }, $_ }
-            $self->entries('values');
-
+        map { push @{ $$V{ delete $$_{CustomField} } ||= [] }
+            , $_ }
+            entries_for values => $sheets;
         [ map {
             if (my $v = delete $$V{$$_{Name}} ) { $$_{Values} = $v }
             $_
-        } $self->entries('CustomFields') ]
-
+        } entries_for CustomFields => $sheets ]
     };
 
     \%config;
-}
+};
 
+sub rt_provision { sheets_as_rt_provision sheets @_ }
 
-
-# sub sheets        ($self) { grep $$_{label}, @{$self->read} }
-# 
-# sub list  ($self,$table) {
-#     state $cache = {};
-#     $$cache{$table} ||= [ _entries $self->_cells->{$table} ];
-# }
 
 1;
