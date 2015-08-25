@@ -2,24 +2,69 @@
 use Eirotic;
 use Test::More;
 use open qw< :utf8 :std >;
-use RTx::Provision::Read::Spreadsheet; 
+use RTx::Provision::Read::Spreadsheet qw(
+    rt_provision sheets
+    values_for keys_for
+);
 
-say YAML::Dump
-    ( RTx::Provision::Read::Spreadsheet
-    -> new(qw( source examples/simple.ods ))
-    -> dump )
+sub yml { say YAML::Dump rt_provision @ARGV }
 
-# Documentation still relevant ? 
-#    say YAML::Dump $provision->data('Users');
-#    say YAML::Dump $provision->attrs('Users');
+for (shift @ARGV) {
+    yml when 'yml';
+    default die "alone";
+}
+
+
+# say YAML::Dump values_for  membership => sheets 'examples/simple.ods';
+# say YAML::Dump values_for  membership => sheets 'examples/simple.ods';
+# say YAML::Dump entries_for membership => sheets 'examples/simple.ods';
+
+
+# use aliased RTx::Provision::Read::Spreadsheet;
+# my $rt = Spreadsheet->new('examples/simple.ods');
+# @Users = $rt->provision('Users');
 
 __END__
 
-#say for keys %{ $provision->_cells };
-values
-Groups
-CustomFields
-Queues
-membership
-ACL
-Users
+---
+CustomFields:
+  - ApplyTo: Global
+    Description: Commentaire
+    LookupType: RT::Queue-RT::Ticket
+    Name: Commentaire
+    Type: Wikitext
+  - ApplyTo: Global
+    Description: composante d'origine
+    LookupType: RT::Queue-RT::Ticket
+    Name: Composante
+    Type: SelectSingle
+    Values:
+      - Category: SXC
+        Name: DI
+        SortOrder: 0
+      - Category: SXC
+        Name: DRH
+        SortOrder: 10
+      - Category: LABO
+        Name: ICUBE
+        SortOrder: 20
+Groups:
+  - Description: Groupe 1
+    Members:
+      Users:
+        - user1
+        - user2
+    Name: groupe1
+  - Description: Groupe 2
+    Members:
+      Groups:
+        - groupe1
+    Name: groupe2
+Queues:
+  - CorrespondAddress: ~
+    Description: Fine n° 1
+    Name: File1
+  - CorrespondAddress: ~
+    Description: Fine n° 2
+    Name: File2
+
