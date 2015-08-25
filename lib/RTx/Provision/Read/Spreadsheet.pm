@@ -1,4 +1,7 @@
 package RTx::Provision::Read::Spreadsheet;
+our $VERSION = '0.0';
+# ABSTRACT: provision your rt initial data with a spreadsheet 
+
 use Spreadsheet::Read;
 use Array::Transpose;
 use Eirotic;
