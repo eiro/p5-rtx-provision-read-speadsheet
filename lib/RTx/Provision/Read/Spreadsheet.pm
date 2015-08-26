@@ -64,7 +64,7 @@ sub sheets_as_rt_provision ($sheets) {
 
     my %config = map
         { $_ => [entries_for $_, $sheets] }
-        qw( Queues );
+        qw( Queues Users );
 
 
     # add members to the groups reading the 'membership' sheet
