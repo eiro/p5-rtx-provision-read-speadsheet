@@ -1,6 +1,6 @@
 package RTx::Provision::Read::Spreadsheet;
 our $VERSION = '0.0';
-# ABSTRACT: provision your rt initial data with a spreadsheet 
+# ABSTRACT: provision your rt initial data with a spreadsheet
 
 use Spreadsheet::Read;
 use Array::Transpose;
@@ -64,8 +64,7 @@ sub sheets_as_rt_provision ($sheets) {
 
     my %config = map
         { $_ => [entries_for $_, $sheets] }
-        qw( Queues Users );
-
+        qw( Queues Users ACL );
 
     # add members to the groups reading the 'membership' sheet
     $config{Groups} = do {
@@ -74,7 +73,7 @@ sub sheets_as_rt_provision ($sheets) {
 
         map { push
             @{ $G
-                -> { $$_{Group} } 
+                -> { $$_{Group} }
                 -> {Members}
                 -> {$$_{Type}} ||= [] }
             , $$_{Member}
@@ -95,6 +94,7 @@ sub sheets_as_rt_provision ($sheets) {
             $_
         } entries_for CustomFields => $sheets ]
     };
+
 
     \%config;
 };
